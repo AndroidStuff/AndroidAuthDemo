@@ -7,7 +7,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.gms.auth.api.Auth;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -16,11 +15,13 @@ import com.google.android.gms.auth.api.signin.GoogleSignInResult;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.SignInButton;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.common.api.Status;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.GoogleAuthProvider;
 
 import timber.log.Timber;
 
@@ -34,7 +35,6 @@ public class MainActivity
     GoogleApiClient mGoogleApiClient;
     FirebaseAuth firebaseAuth;
     FirebaseAuth.AuthStateListener authStateListener;
-    private static final String TAG = "SignInActivity";
     private static final int RC_SIGN_IN = 9001;
 
     @Override
@@ -57,6 +57,7 @@ public class MainActivity
 
         GoogleSignInOptions gso = new GoogleSignInOptions
                 .Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
 
@@ -104,11 +105,14 @@ public class MainActivity
 
     private void signOut() {
         Timber.d("Signing out...");
-        PendingResult<Status> statusPendingResult = Auth.GoogleSignInApi.signOut(mGoogleApiClient);
+        firebaseAuth.signOut();
+        updateUIState();
+/*        PendingResult<Status> statusPendingResult = Auth.GoogleSignInApi.signOut(mGoogleApiClient);
         statusPendingResult.setResultCallback(new ResultCallback<Status>() {
             @Override
             public void onResult(@NonNull Status status) {
                 if(status.isSuccess()) {
+                    firebaseAuth.signOut();
                     Toast.makeText(MainActivity.this, status.getStatusMessage(), Toast.LENGTH_SHORT)
                             .show();
                     signOutButton.setVisibility(View.INVISIBLE);
@@ -119,7 +123,7 @@ public class MainActivity
                             .show();
                 }
             }
-        });
+        });*/
     }
 
     private void signIn() {
@@ -147,10 +151,39 @@ public class MainActivity
     private void handleSignInResult(GoogleSignInResult result) {
         if (result.isSuccess()) {
             GoogleSignInAccount acct = result.getSignInAccount();
-            statusTextView.setText("Hello, " + acct.getDisplayName()); //pulls the user name
+            firebaseAuthWithGoogle(acct);
+        } else {
+            Timber.d("Error signing-in with Google account.."+ result.getStatus().getStatusMessage());
+        }
+    }
+
+    private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
+        AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
+        firebaseAuth.signInWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            // Firebase-Sign in success, update UI with the signed-in user's information
+                            Timber.d("Successfully signed into Firebase with Google acct");
+                            updateUIState();
+                        } else {
+                            Timber.d("Error signing-into Firebase with Google credentials..");
+                        }
+                    }
+                });
+    }
+
+    private void updateUIState() {
+        if (firebaseAuth != null && firebaseAuth.getCurrentUser() != null) {
+            FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+            statusTextView.setText("Hello, " + currentUser.getDisplayName()); //pulls the user name
             signInButton.setVisibility(View.INVISIBLE);
             signOutButton.setVisibility(View.VISIBLE);
         } else {
+            statusTextView.setText("Hello, Anonymous!");
+            signInButton.setVisibility(View.VISIBLE);
+            signOutButton.setVisibility(View.INVISIBLE);
         }
     }
 }
