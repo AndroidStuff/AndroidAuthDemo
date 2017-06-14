@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -20,6 +19,10 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
+import timber.log.Timber;
 
 public class MainActivity
         extends AppCompatActivity
@@ -29,6 +32,8 @@ public class MainActivity
     private Button signOutButton;
     TextView statusTextView;
     GoogleApiClient mGoogleApiClient;
+    FirebaseAuth firebaseAuth;
+    FirebaseAuth.AuthStateListener authStateListener;
     private static final String TAG = "SignInActivity";
     private static final int RC_SIGN_IN = 9001;
 
@@ -36,6 +41,19 @@ public class MainActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        firebaseAuth = FirebaseAuth.getInstance();
+        authStateListener = new FirebaseAuth.AuthStateListener() {
+            @Override
+            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+                FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+                if (currentUser != null) {
+                    Timber.d("Current loggedin user is %s", currentUser.getDisplayName());
+                } else {
+                    Timber.d("User signed out..");
+                }
+            }
+        };
 
         GoogleSignInOptions gso = new GoogleSignInOptions
                 .Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -56,6 +74,20 @@ public class MainActivity
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        firebaseAuth.addAuthStateListener(authStateListener);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (firebaseAuth != null) {
+            firebaseAuth.removeAuthStateListener(authStateListener);
+        }
+    }
+
+    @Override
     public void onClick(View v) {
         switch(v.getId()){
             case R.id.gsign_in_button:
@@ -65,15 +97,13 @@ public class MainActivity
                 signOut();
                 break;
             default:
-                Log.d(MainActivity.class.getCanonicalName(), "Unknown id clicked : "+v.getId());
+                Timber.d("Unknown id clicked : %d", v.getId());
                 break;
-
-
         }
     }
 
     private void signOut() {
-        Log.d(MainActivity.class.getCanonicalName(), "Signing out...");
+        Timber.d("Signing out...");
         PendingResult<Status> statusPendingResult = Auth.GoogleSignInApi.signOut(mGoogleApiClient);
         statusPendingResult.setResultCallback(new ResultCallback<Status>() {
             @Override
@@ -100,7 +130,7 @@ public class MainActivity
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         // An unresolvable error has occurred and Google APIs won't be available.
-        Log.d(TAG, "onConnectionFailed:" + connectionResult);
+        Timber.d( "onConnectionFailed: %s", connectionResult.getErrorMessage());
     }
 
     @Override
