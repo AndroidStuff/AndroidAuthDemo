@@ -30,6 +30,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-core:11.0.0'
     implementation 'com.google.firebase:firebase-auth:11.0.0'
     implementation 'com.google.android.gms:play-services-auth:11.0.0'
+    implementation 'com.jakewharton.timber:timber:4.5.1'
 }
 
 apply plugin: 'com.google.gms.google-services'
